@@ -9,7 +9,6 @@
             "name": "run",
             "request": "launch",
             "mainClass": "merl1n.app.shell.run",
-            "projectName": "Merl1n"
         }
     ]
 }
