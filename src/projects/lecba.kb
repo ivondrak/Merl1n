@@ -1,0 +1,36 @@
+/* Knowledge base module definition */
+ask "Alergie na aspirin" boolean alergie := false
+text lék ("vitamin C","aspirin","paralen","antibiotika") := "vitamin C"
+text léèba := "Doporuèený lék"
+
+vitamíny
+if
+	choroba = "nachlazení"
+then
+	lék := "vitamin C",
+	print léèba+" "+lék,nl
+end
+
+aspirin
+if
+	choroba = "chøipka" and not alergie
+then
+	lék := "aspirin",
+	print léèba+" "+lék,nl
+end	
+	
+paralen
+if
+	choroba = "chøipka" and alergie
+then
+	lék := "paralen",
+	print léèba+" "+lék,nl
+end
+
+antibiotika
+if
+	choroba = "zápal plic"
+then
+	lék := "antibiotika",
+	print léèba+" "+lék,nl
+end

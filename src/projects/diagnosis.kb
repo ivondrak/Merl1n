@@ -1,0 +1,71 @@
+/* Knowledge base module definition */
+ask  "Temperature in [C]" real temperature := 36.5
+ask "Cough" boolean cough := false
+ask "Tiredness" text tiredness ("No or Little","Medium","Huge") := "No or Little"
+text temperatureCategory ("Normal","Increased","High")
+text desease ("Healthy","Cold","Flu","Pneumonia") := "Healthy"
+text message := "Pacient suffers from "
+
+norm_temperature:10
+if
+	temperature <= 37.0
+then
+	temperatureCategory := "Normal"
+end
+
+inc_temperature:10
+if
+	temperature > 37.0 and temperature <= 38.0
+then
+	print "Pacient suffers from increased temperature. ",
+	document "See what to do in this case..." at "demo/demo.html",nl,
+	temperatureCategory := "Increased"
+end
+
+hight_temperature:10
+if 
+	temperature > 38.0
+then
+	print "Pacient suffers from high temperature. ",
+	document "See what to do in this case..." at "demo/demo.html",nl,
+	temperatureCategory := "High"
+end
+
+pneumonia:5
+if
+	( temperatureCategory = "High" or  temperatureCategory = "Increased") and 
+	cough and 
+	(tiredness = "Medium" or tiredness = "Huge")
+then
+	desease := "Pneumonia",
+	print message + desease,nl,
+	exec "Treatment"
+end
+
+flu:5
+if
+	temperatureCategory = "High" and  not (cough)
+then
+	desease := "Flu",
+	print message + desease,nl,
+	exec "Treatment"
+end
+
+cold:5
+if
+	 temperatureCategory = "Increased" and not cough and
+	(tiredness = "No or Little" or tiredness = "Medium")
+then
+	desease := "Flu",
+	print message + desease,nl,
+	exec "Treatment"
+end
+
+healthy:5
+if
+	temperatureCategory = "Normal"
+then
+	print "Pacient is O.K.! ",
+	print "It's time to enjoy life in ",
+	image "Monte Carlo" at "demo/Monte_Carlo.jpg",nl
+end

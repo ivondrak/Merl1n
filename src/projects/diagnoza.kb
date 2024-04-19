@@ -1,0 +1,71 @@
+/* Knowledge base module definition */
+ask  "Teplota" real teplota := 36.5
+ask "Kašel" boolean kašel := false
+ask "Únava" text únava ("malá","støední","znaèná") := "malá"
+text teplotníKategorie ("normální","zvıšená","vysoká")
+text choroba ("ádná","nachlazení","chøipka","zápal plic") := "ádná"
+text zpráva := "Pacient trpí chorobou: "
+
+norm_teplota:10
+if
+	teplota <= 37.0
+then
+	teplotníKategorie := "normální"
+end
+
+zvıš_teplota:10
+if
+	teplota > 37.0 and teplota <= 38.0
+then
+	print "Pacient trpí zvıšenou teplotou. ",
+	document "Co v takovém pøípadì dìlat..." at "demo/demo.html",nl,
+	teplotníKategorie := "zvıšená"
+end
+
+vysoká_teplota:10
+if 
+	teplota > 38.0
+then
+	print "Pozor! Pacient má vysokou teplotu. ",
+	document "Co v takovém pøípadì dìlat..." at "demo/demo.html",nl,
+	teplotníKategorie := "vysoká"
+end
+
+zápal_plic:5
+if
+	(teplotníKategorie = "vysoká" or teplotníKategorie = "zvıšená") and 
+	kašel and 
+	(únava = "støední" or únava = "znaèná")
+then
+	choroba := "zápal plic",
+	print zpráva + choroba,nl,
+	exec "Léèba"
+end
+
+chøipka:5
+if
+	teplotníKategorie = "vysoká" and  not (kašel)
+then
+	choroba := "chøipka",
+	print zpráva + choroba,nl,
+	exec "Léèba"
+end
+
+nachlazení:5
+if
+	teplotníKategorie = "zvıšená" and not kašel and
+	(únava = "malá" or únava = "støední")
+then
+	choroba := "chøipka",
+	print zpráva + choroba,nl,
+	exec "Léèba"
+end
+
+zdráv:5
+if
+	teplotníKategorie = "normální"
+then
+	print "Pacient je zdráv! ",
+	print "A si jede uívat ivota do ",
+	image "Monte Carla..." at "demo/Monte_Carlo.jpg",nl
+end

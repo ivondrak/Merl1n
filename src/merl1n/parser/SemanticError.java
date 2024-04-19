@@ -1,0 +1,73 @@
+package merl1n.parser;
+
+/**
+ * The Semantic error class is thrown when semantic error occurs
+ *
+ * @author Ivo Vondrak
+ * @version 1.0 09/27/99
+ */ 
+public class SemanticError extends Error {
+    /**
+     * Incorrect assignment
+     */
+    final public static int ASSIGNMENT = 1;
+    
+    /**
+     * Variable already declared
+     */
+    final public static int VARIABLE = 2;
+    
+    /**
+     * Unknown symbol
+     */
+    final public static int UNKNOWN = 3;
+    
+    /**
+     * Incorrect type
+     */
+    final public static int TYPE = 4;
+   
+    /**
+     * Reference to error code
+     */
+    protected int errorCode;
+
+    /**
+     * Rerence to token
+     */
+    public Token currentToken;
+   
+    /**
+     * Constructor
+     */
+    public SemanticError(Token token, int code) {
+        super("");
+        currentToken = token;
+        errorCode = code;
+    }
+   
+    /**
+     * Gets message
+     */
+    public String getMessage() {
+        String message ="Semantic error";
+        if (currentToken.image == null) return message;
+        switch (errorCode) {
+            case ASSIGNMENT:
+                message = "Incorrect assignment of \""+currentToken.image+"\"";
+                break;
+            case VARIABLE:
+                message = "Variable \""+currentToken.image+"\" already declared";
+                break;
+            case UNKNOWN:
+                message = "Unknown symbol \""+currentToken.image+"\"";
+                break;
+            case TYPE:
+                message = "Incorrect type of variable/literal used in the expression";
+                break;
+        }
+        return message;
+    }
+   
+   
+}

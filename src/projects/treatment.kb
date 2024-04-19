@@ -1,0 +1,36 @@
+/* Knowledge base module definition */
+ask "Alergy to aspirin" boolean alergy := false
+text medicament ("Vitamin C","Aspirin","Panadol","Antibiotics") := "Vitamin C"
+text treatment := "Suggested medicament"
+
+vitamins
+if
+	desease  = "Cold"
+then
+	medicament := "Vitamin C",
+	print treatment+" "+medicament,nl
+end
+
+aspirin
+if
+	desease = "Flu" and not alergy
+then
+	medicament := "Aspirin",
+	print treatment+" "+medicament,nl
+end	
+	
+panadol
+if
+	desease = "Flu" and alergy
+then
+	medicament := "Panadol",
+	print treatment+" "+medicament,nl
+end
+
+antibiotics
+if
+	desease = "Pneumonia"
+then
+	medicament := "Antibiotics",
+	print treatment+" "+medicament,nl
+end

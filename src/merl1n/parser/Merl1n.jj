@@ -1,0 +1,957 @@
+/**
+ * The definition of Merl1n knowledge grammar
+ *
+ * @author Ivo Vondrak
+ * @version 1.0 09/23/99
+ */ 
+
+options {
+    STATIC = false;
+    UNICODE_INPUT = false;
+    JAVA_UNICODE_ESCAPE = true;
+    USER_CHAR_STREAM = false;
+}
+
+PARSER_BEGIN(Parser)
+package merl1n.parser;
+
+import java.io.*;
+import java.util.*;
+
+import merl1n.es.*;
+import merl1n.tool.*;
+
+public class Parser {
+    /**
+     * Reference to project
+     */
+     protected Project project;
+     
+     /**
+      * Reference to module
+      */
+     protected Module module;
+     
+     public void setProject(Project project) {
+        this.project = project;
+     }
+     
+     public void setModule(Module module) {
+        this.module = module;
+     }
+}
+
+PARSER_END(Parser)
+
+
+SKIP :
+{
+    " "
+    | "\t"
+    | "\r"
+    | "\n"
+    | "\f"
+    | <"/*" (~["*"])* "*" (~["/"] (~["*"])* "*")* "/">
+}
+
+TOKEN : /* Literals */
+{
+    < BOOLEAN_LITERAL: ( "true" | "false" ) >
+    |
+    < INTEGER_LITERAL: ["0"-"9"] (["0"-"9"])* >
+    |
+    < REAL_LITERAL:
+        ((["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)?)
+        | ("." (["0"-"9"])+ (<EXPONENT>)?)
+        | ((["0"-"9"])+ (<EXPONENT>)?)
+    >
+    |
+    < #EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+    |
+    < TEXT_LITERAL: "\"" (~["\"","\\"])* "\"">
+}
+
+TOKEN : /* Types */
+{
+    < BOOLEAN: "boolean" >
+    |
+    < INTEGER: "integer" >
+    |
+    < REAL: "real" >
+    |
+    < TEXT: "text" >
+}
+
+TOKEN : /* Keywords */
+{
+    < ASK: "ask">
+    |
+    < IF: "if" >
+    |
+    < THEN: "then" >
+    |
+    < SEND: "send" > /* Backward compatibility */
+    |
+    < PRINT: "print">
+    |
+    < NL: "nl">
+    |
+    < EXEC: "exec" >
+    |
+    < STOP: "stop" >
+    |
+    < IMAGE: "image">
+    |
+    < DOCUMENT: "document">
+    |
+    < AT: "at">
+    |
+    < AND: "and" >
+    |
+    < OR: "or" >
+    |
+    < NOT: "not" >
+    |
+    < END: "end" >
+}
+
+TOKEN : /* Identifiers */
+{
+    < IDENTIFIER: <LETTER> (<LETTER>|<DIGIT>)* >
+    |
+    < #LETTER:
+        [
+        "\u0024",
+        "\u0041"-"\u005a",
+        "\u005f",
+        "\u0061"-"\u007a",
+        "\u00c0"-"\u00d6",
+        "\u00d8"-"\u00f6",
+        "\u00f8"-"\u00ff",
+        "\u0100"-"\u1fff",
+        "\u3040"-"\u318f",
+        "\u3300"-"\u337f",
+        "\u3400"-"\u3d2d",
+        "\u4e00"-"\u9fff",
+        "\uf900"-"\ufaff"
+        ]    
+    >
+    |
+    < #DIGIT:
+        [
+        "\u0030"-"\u0039",
+        "\u0660"-"\u0669",
+        "\u06f0"-"\u06f9",
+        "\u0966"-"\u096f",
+        "\u09e6"-"\u09ef",
+        "\u0a66"-"\u0a6f",
+        "\u0ae6"-"\u0aef",
+        "\u0b66"-"\u0b6f",
+        "\u0be7"-"\u0bef",
+        "\u0c66"-"\u0c6f",
+        "\u0ce6"-"\u0cef",
+        "\u0d66"-"\u0d6f",
+        "\u0e50"-"\u0e59",
+        "\u0ed0"-"\u0ed9",
+        "\u1040"-"\u1049"
+        ]    
+    >
+}
+
+void compile() : {}
+{
+    (
+        varDeclaration()
+        |
+        ruleDefinition()
+    )*
+    <EOF>
+}
+
+void varDeclaration() :
+{ 
+}
+{
+    LOOKAHEAD(3)
+    booleanVarDeclaration()
+    |
+    LOOKAHEAD(3)
+    integerVarDeclaration()
+    |
+    LOOKAHEAD(3)
+    realVarDeclaration()
+    |
+    textVarDeclaration()
+}
+
+void booleanVarDeclaration() :
+{
+    Token l, v, val;
+    BooleanVariable var;
+    l = v = val = null;
+}
+{
+    (<ASK> l = <TEXT_LITERAL>)?
+    <BOOLEAN> v = <IDENTIFIER>
+    {
+        if (project.getVariables().get(v.image) != null)
+            throw new SemanticError(token,SemanticError.VARIABLE);
+        var = new BooleanVariable();
+        project.getVariables().put(v.image, var);
+        module.getVariables().addElement(var);
+        if (l != null)
+            var.setLabel(l.image.substring(1,l.image.length()-1));
+    }
+    (":=" val = <BOOLEAN_LITERAL>)?
+    {
+        if (val != null) {
+            var.initialize(new Boolean(val.image));
+        }
+    }
+}
+
+void integerVarDeclaration() :
+{
+    Token l, v, val, item;
+    IntegerVariable var;
+    Vector range;
+    l = v = val = item = null;
+}
+{
+    (<ASK> l = <TEXT_LITERAL>)?
+    <INTEGER> v = <IDENTIFIER>
+    {
+        if (project.getVariables().get(v.image) != null)
+            throw new SemanticError(token,SemanticError.VARIABLE);
+        var = new IntegerVariable();
+        project.getVariables().put(v.image, var);
+        module.getVariables().addElement(var);
+        if (l != null)
+            var.setLabel(l.image.substring(1,l.image.length()-1));
+    }
+    (
+        "(" item = <INTEGER_LITERAL> 
+        { 
+            range = new Vector();
+            range.addElement(new Integer(item.image));
+        } 
+        ("," item = <INTEGER_LITERAL> 
+        { 
+            range.addElement(new Integer(item.image));
+        }
+        )+ ")"
+        {
+            var.setRange(range);
+        }
+    )?
+    (":=" val = <INTEGER_LITERAL>)?
+    {
+        if (val != null) {
+            var.initialize(new Integer(val.image));
+            if (!var.isValid(var.getValue()))
+                throw new SemanticError(token, SemanticError.ASSIGNMENT);
+        }
+    }
+}
+
+void realVarDeclaration() :
+{
+    Token l, v, val, item;
+    RealVariable var;
+    Vector range;
+    l = v = val = item = null;
+}
+{
+    (<ASK> l = <TEXT_LITERAL>)?
+    <REAL> v = <IDENTIFIER>
+    {
+        if (project.getVariables().get(v.image) != null)
+            throw new SemanticError(token,SemanticError.VARIABLE);
+        var = new RealVariable();
+        project.getVariables().put(v.image, var);
+        module.getVariables().addElement(var);
+        if (l != null)
+            var.setLabel(l.image.substring(1,l.image.length()-1));
+    }
+    (
+        "(" item = <REAL_LITERAL> 
+        { 
+            range = new Vector();
+            range.addElement(new Float(item.image));
+        } 
+        ("," item = <REAL_LITERAL> 
+        { 
+            range.addElement(new Float(item.image));
+        }
+        )+ ")"
+        {
+            var.setRange(range);
+        }
+    )?
+    (":=" val = <REAL_LITERAL>)?
+    {
+        if (val != null) {
+            var.initialize(new Float(val.image));
+            if (!var.isValid(var.getValue()))
+                throw new SemanticError(token, SemanticError.ASSIGNMENT);
+        }
+    }
+}
+
+void textVarDeclaration() :
+{
+    Token l, v, val, item;
+    TextVariable var;
+    Vector range;
+    l = v = val = item = null;
+}
+{
+    (<ASK> l = <TEXT_LITERAL>)?
+    <TEXT> v = <IDENTIFIER>
+    {
+        if (project.getVariables().get(v.image) != null)
+            throw new SemanticError(token,SemanticError.VARIABLE);
+        var = new TextVariable();
+        project.getVariables().put(v.image, var);
+        module.getVariables().addElement(var);
+        if (l != null)
+            var.setLabel(l.image.substring(1,l.image.length()-1));
+    }
+    (
+        "(" item = <TEXT_LITERAL> 
+        { 
+            range = new Vector();
+            range.addElement(item.image.substring(1,item.image.length()-1));
+        } 
+        ("," item = <TEXT_LITERAL> 
+        { 
+            range.addElement(item.image.substring(1,item.image.length()-1));
+        }
+        )+ ")"
+        {
+            var.setRange(range);
+        }
+    )?
+    (":=" val = <TEXT_LITERAL>)?
+    {
+        if (val != null) {
+            var.initialize(val.image.substring(1,val.image.length()-1));
+            if (!var.isValid(var.getValue()))
+                throw new SemanticError(token, SemanticError.ASSIGNMENT);
+        }
+    }
+}
+
+
+void ruleDefinition() :
+{
+    Token id, p;
+    Rule rule;
+    Condition cond;
+    id = p = null;
+}
+{
+    id = <IDENTIFIER> (":" p = <INTEGER_LITERAL>)?
+    {
+        rule = new Rule();
+        rule.setName(id.image);
+        if (p != null)
+            rule.setPriority(new Integer(p.image).intValue());
+        cond = new Condition();
+        rule.setCondition(cond);
+        module.getRules().insertElement(rule);
+    }
+    <IF> condition(cond)
+    <THEN> actions(rule)
+    <END>
+}
+
+// Condition part of a rule
+
+void condition(Condition cond) :
+{
+    BooleanNode booleanNode = new BooleanNode();
+    cond.setRoot(booleanNode);
+}
+{
+    booleanExpression(booleanNode)
+    {
+        try {
+            if (!(booleanNode.evaluate() instanceof Boolean))
+                throw new SemanticError(token,SemanticError.TYPE);
+        }
+        catch (Exception e) {
+            throw new SemanticError(token,SemanticError.TYPE);
+        }
+    }
+}
+
+void booleanExpression(BooleanNode booleanNode) :
+{
+    AndNode andNode = new AndNode();
+    BooleanNode currentNode = booleanNode;
+}
+{
+    andExpression(andNode) 
+    {
+        currentNode.addChild(andNode);   
+    }
+    (
+        <OR>
+        {
+            BooleanNode nextBooleanNode = new BooleanNode();
+            currentNode.addChild(nextBooleanNode);
+            currentNode = nextBooleanNode;
+            AndNode nextAndNode = new AndNode();
+            currentNode.addChild(nextAndNode);
+        }
+        andExpression(nextAndNode)
+    )*
+}
+
+void andExpression(AndNode andNode) :
+{
+    EqualityNode equalityNode = new EqualityNode();
+    AndNode currentNode = andNode;
+}
+{
+    equalityExpression(equalityNode)
+    {
+        currentNode.addChild(equalityNode);
+    }
+    (   
+        <AND>
+        {
+            AndNode nextAndNode = new AndNode();
+            currentNode.addChild(nextAndNode);
+            currentNode = nextAndNode;
+            EqualityNode nextEqualityNode = new EqualityNode();
+            currentNode.addChild(nextEqualityNode);
+        }
+        equalityExpression(nextEqualityNode)
+    )*
+}
+
+void equalityExpression(EqualityNode equalityNode) :
+{
+    Token oper;
+    RelationalNode relationalNode = new RelationalNode();
+    EqualityNode currentNode = equalityNode;
+}
+{
+    relationalExpression(relationalNode)
+    {
+        currentNode.addChild(relationalNode);
+    }
+    (
+        ( oper = "=" | oper = "!=")
+        {
+            if (oper.image.equals("="))
+                currentNode.setOperator(EqualityNode.EQUAL);
+            if (oper.image.equals("!="))
+                currentNode.setOperator(EqualityNode.NONEQUAL);
+            EqualityNode nextEqualityNode = new EqualityNode();
+            currentNode.addChild(nextEqualityNode);
+            currentNode = nextEqualityNode;
+            RelationalNode nextRelationalNode = new RelationalNode();
+            currentNode.addChild(nextRelationalNode);
+        }
+        relationalExpression(nextRelationalNode)
+    )*
+}
+
+void relationalExpression(RelationalNode relationalNode) :
+{
+    Token oper;
+    AdditiveNode additiveNode = new AdditiveNode();
+    RelationalNode currentNode = relationalNode;
+}
+{
+    additiveExpression(additiveNode)
+    {
+        currentNode.addChild(additiveNode);
+    }
+    (
+        (oper = "<" | oper = ">" | oper = "<=" | oper = ">=")
+        {
+            if (oper.image.equals("<"))
+                currentNode.setOperator(RelationalNode.LT);
+            if (oper.image.equals(">"))
+                currentNode.setOperator(RelationalNode.GT);
+            if (oper.image.equals("<="))
+                currentNode.setOperator(RelationalNode.LE);
+            if (oper.image.equals(">="))
+                currentNode.setOperator(RelationalNode.GE);
+            RelationalNode nextRelationalNode = new RelationalNode();
+            currentNode.addChild(nextRelationalNode);
+            currentNode = nextRelationalNode;
+            AdditiveNode nextAdditiveNode = new AdditiveNode();
+            currentNode.addChild(nextAdditiveNode);
+        }
+        additiveExpression(nextAdditiveNode)
+    )*
+}
+
+void additiveExpression(AdditiveNode additiveNode) :
+{
+    Token oper;
+    MultiplicativeNode multiplicativeNode = new MultiplicativeNode();
+    AdditiveNode currentNode = additiveNode;
+}
+{
+    multiplicativeExpression(multiplicativeNode)
+    {
+        currentNode.addChild(multiplicativeNode);
+    }
+    (
+        ( oper = "+" | oper = "-")
+        {
+            if (oper.image.equals("+"))
+                currentNode.setOperator(AdditiveNode.PLUS);
+            if (oper.image.equals("-"))
+                currentNode.setOperator(AdditiveNode.MINUS);
+            AdditiveNode nextAdditiveNode = new AdditiveNode();
+            currentNode.addChild(nextAdditiveNode);
+            currentNode = nextAdditiveNode;
+            MultiplicativeNode nextMultiplicativeNode = new MultiplicativeNode();
+            currentNode.addChild(nextMultiplicativeNode);
+        }
+        multiplicativeExpression(nextMultiplicativeNode)
+    )*
+}
+
+void multiplicativeExpression(MultiplicativeNode multiplicativeNode) :
+{
+    Token oper;
+    UnaryNode unaryNode = new UnaryNode();
+    MultiplicativeNode currentNode = multiplicativeNode;
+}
+{
+    unaryExpression(unaryNode)
+    {
+        currentNode.addChild(unaryNode);
+    }
+    (
+        ( oper = "*" | oper = "/" | oper = "%") 
+        {
+            if (oper.image.equals("*"))
+                currentNode.setOperator(MultiplicativeNode.MUL);
+            if (oper.image.equals("/"))
+                currentNode.setOperator(MultiplicativeNode.DIV);
+            if (oper.image.equals("%"))
+                currentNode.setOperator(MultiplicativeNode.MOD);
+            MultiplicativeNode nextMultiplicativeNode = new MultiplicativeNode();
+            currentNode.addChild(nextMultiplicativeNode);
+            currentNode = nextMultiplicativeNode;
+            UnaryNode nextUnaryNode = new UnaryNode();
+            currentNode.addChild(nextUnaryNode);
+        }
+        unaryExpression(nextUnaryNode)
+    )*
+}
+
+void unaryExpression(UnaryNode unaryNode) :
+{
+    Token oper;
+}
+{
+    (
+        ( oper = "-" | oper = <NOT>)
+        {
+            if (oper.image.equals("-"))
+                unaryNode.setOperator(UnaryNode.MINUS);
+            if (oper.image.equals("not"))
+                unaryNode.setOperator(UnaryNode.NOT);
+            UnaryNode nextUnaryNode = new UnaryNode();
+            unaryNode.addChild(nextUnaryNode);
+        }
+        unaryExpression(nextUnaryNode)
+    )
+    |
+    primaryExpression(unaryNode)
+}
+
+void primaryExpression(UnaryNode unaryNode) :
+{
+    Token primary;
+    LiteralNode literalNode = new LiteralNode();
+}
+{
+    primary = <BOOLEAN_LITERAL>
+    {
+        Boolean bool = new Boolean(primary.image);
+        literalNode.setValue(bool);
+        unaryNode.addChild(literalNode);
+    }
+    |
+    primary = <INTEGER_LITERAL>
+    {
+        Integer integer = new Integer(primary.image);
+        literalNode.setValue(integer);
+        unaryNode.addChild(literalNode);
+    }
+    |
+    primary = <REAL_LITERAL>
+    {
+        Float f = new Float(primary.image);
+        literalNode.setValue(f);
+        unaryNode.addChild(literalNode);
+    }
+    |
+    primary = <TEXT_LITERAL>
+    {
+        String text = primary.image.substring(1,primary.image.length()-1);
+        literalNode.setValue(text);
+        unaryNode.addChild(literalNode);
+    }
+    |
+    primary = <IDENTIFIER>
+    {
+        String name = primary.image;
+        if (project.getVariables().get(name) == null) {
+            throw new SemanticError(token,SemanticError.UNKNOWN);
+        }
+        IdentifierNode identifierNode = new IdentifierNode(project.getVariables());
+        identifierNode.setName(name);
+        unaryNode.addChild(identifierNode);
+    }
+    |
+    "("
+    {
+        BooleanNode booleanNode = new BooleanNode();
+        unaryNode.addChild(booleanNode);
+    }
+    booleanExpression(booleanNode) 
+    ")"
+}
+
+void actions(Rule rule) :
+{
+    Vector actions = new Vector();
+    Assignment assign;
+    TextNode textNode, labelNode;
+    Print print;
+}
+{
+    (
+        assign = assignment()
+        {
+            actions.addElement(assign);
+        }
+        |
+        <SEND> textExpression(textNode = new TextNode())
+        {
+            print = new Print();
+            print.setProject(project);
+            print.setExpression(textNode);
+            actions.addElement(print);
+        }
+        |
+        <PRINT> textExpression(textNode = new TextNode())
+        {
+            print = new Print();
+            print.setProject(project);
+            print.setExpression(textNode);
+            actions.addElement(print);
+        }
+        |
+        <NL>
+        {
+            NewLine nl = new NewLine();
+            nl.setProject(project);
+            actions.addElement(nl);
+        }
+        |
+        <EXEC> textExpression(textNode = new TextNode())
+        {
+            Exec exec = new Exec();
+            exec.setProject(project);
+            exec.setExpression(textNode);
+            actions.addElement(exec);
+        }
+        |
+        <STOP>
+        {
+            Stop stop = new Stop();
+            stop.setProject(project);
+            actions.addElement(stop);
+        }
+        |
+        <IMAGE> textExpression(labelNode = new TextNode())
+        <AT> textExpression(textNode = new TextNode())
+        {
+            ImageLink imageLink = new ImageLink();
+            imageLink.setProject(project);
+            imageLink.setLabel(labelNode);
+            imageLink.setLocation(textNode);
+            actions.addElement(imageLink);
+        }
+        |
+        <DOCUMENT> textExpression(labelNode = new TextNode())
+        <AT> textExpression(textNode = new TextNode())
+        {
+            DocLink docLink = new DocLink();
+            docLink.setProject(project);
+            docLink.setLabel(labelNode);
+            docLink.setLocation(textNode);
+            actions.addElement(docLink);
+        }
+    )
+    (
+        ","
+        (
+            assign = assignment()
+            {
+                actions.addElement(assign);
+            }
+            |
+            <SEND> textExpression(textNode = new TextNode())
+            {
+                print = new Print();
+                print.setProject(project);
+                print.setExpression(textNode);
+                actions.addElement(print);
+            }
+            |
+            <PRINT> textExpression(textNode = new TextNode())
+            {
+                print = new Print();
+                print.setProject(project);
+                print.setExpression(textNode);
+                actions.addElement(print);
+            }
+            |
+            <NL>
+            {
+                NewLine nl = new NewLine();
+                nl.setProject(project);
+                actions.addElement(nl);
+            }
+            |
+            <EXEC> textExpression(textNode = new TextNode())
+            {
+                Exec exec = new Exec();
+                exec.setProject(project);
+                exec.setExpression(textNode);
+                actions.addElement(exec);
+            }
+            |
+            <STOP>
+            {
+                Stop stop = new Stop();
+                stop.setProject(project);
+                actions.addElement(stop);
+            }
+            |
+            <IMAGE> textExpression(labelNode = new TextNode())
+            <AT> textExpression(textNode = new TextNode())
+            {
+                ImageLink imageLink = new ImageLink();
+                imageLink.setProject(project);
+                imageLink.setLabel(labelNode);
+                imageLink.setLocation(textNode);
+                actions.addElement(imageLink);
+            }
+            |
+            <DOCUMENT> textExpression(labelNode = new TextNode())
+            <AT> textExpression(textNode = new TextNode())
+            {
+                DocLink docLink = new DocLink();
+                docLink.setProject(project);
+                docLink.setLabel(labelNode);
+                docLink.setLocation(textNode);
+                actions.addElement(docLink);
+            }
+        )
+    )*
+    {
+        rule.setActions(actions);
+    }
+}
+
+Assignment assignment() :
+{
+    Token id;
+    Variable var;
+    Assignment assign = null;
+}
+{
+    id = <IDENTIFIER>
+    {
+        if ((var = (Variable) project.getVariables().get(id.image)) == null)
+            throw new SemanticError(token,SemanticError.UNKNOWN);
+        switch (var.getType()) {
+            case Public.BOOLEAN:
+                assign = booleanAssignment();
+                break;
+            case Public.INTEGER:
+            case Public.REAL:
+                assign = numberAssignment();
+                break;
+            case Public.TEXT:
+                assign = textAssignment();
+                break;
+        }
+        assign.setVariable(var);
+        return assign;
+    }
+}
+
+Assignment booleanAssignment() :
+{
+    Assignment assign;
+    BooleanNode booleanNode;
+}
+{
+    ":=" booleanExpression(booleanNode = new BooleanNode())
+    {
+        assign = new BooleanAssignment();
+        ((BooleanAssignment) assign).setExpression(booleanNode);
+        return assign;
+    }
+}
+
+Assignment numberAssignment() :
+{
+    Assignment assign;
+    NumericalNode numericalNode;
+}
+{
+    ":=" numericalExpression(numericalNode = new NumericalNode())
+    {
+        assign = new NumberAssignment();
+        ((NumberAssignment) assign).setExpression(numericalNode);
+        return assign;
+    }
+}
+
+Assignment textAssignment() :
+{
+    Assignment assign;
+    TextNode textNode;
+}
+{
+    ":=" textExpression(textNode = new TextNode())
+    {
+        assign = new TextAssignment();
+        ((TextAssignment) assign).setExpression(textNode);
+        return assign;
+    }
+}
+
+
+void numericalExpression(NumericalNode numericalNode) :
+{
+    AdditiveNode additiveNode = new AdditiveNode();
+    numericalNode.addChild(additiveNode);
+}
+{
+    additiveExpression(additiveNode)
+    {
+        try {
+            if (!(numericalNode.evaluate() instanceof Number))
+                throw new SemanticError(token,SemanticError.TYPE);
+        }
+        catch (Exception e) {
+            throw new SemanticError(token,SemanticError.TYPE);
+        }
+    }
+}
+
+void textExpression(TextNode textNode) :
+{
+    Token primary;
+    LiteralNode literalNode;
+    IdentifierNode identifierNode;
+}
+{
+    (
+        primary = <BOOLEAN_LITERAL>
+        {
+            Boolean bool = new Boolean(primary.image);
+            literalNode = new LiteralNode();
+            literalNode.setValue(bool);
+            textNode.addChild(literalNode);
+        }
+        |
+        primary = <INTEGER_LITERAL>
+        {
+            Integer integer = new Integer(primary.image);
+            literalNode = new LiteralNode();
+            literalNode.setValue(integer);
+            textNode.addChild(literalNode);
+        }
+        |
+        primary = <REAL_LITERAL>
+        {
+            Float f = new Float(primary.image);
+            literalNode = new LiteralNode();
+            literalNode.setValue(f);
+            textNode.addChild(literalNode);
+        }
+        |
+        primary = <TEXT_LITERAL>
+        {
+            String text = primary.image.substring(1,primary.image.length()-1);
+            literalNode = new LiteralNode();
+            literalNode.setValue(text);
+            textNode.addChild(literalNode);
+        }
+        |
+        primary = <IDENTIFIER>
+        {
+            String name = primary.image;
+            if (project.getVariables().get(name) == null)
+                throw new SemanticError(token,SemanticError.UNKNOWN);
+            identifierNode = new IdentifierNode(project.getVariables());
+            identifierNode.setName(name);
+            textNode.addChild(identifierNode);
+        }
+    )
+    
+    ("+" 
+        (
+            primary = <BOOLEAN_LITERAL>
+            {
+                Boolean bool = new Boolean(primary.image);
+                literalNode = new LiteralNode();
+                literalNode.setValue(bool);
+                textNode.addChild(literalNode);
+            }
+            |
+            primary = <INTEGER_LITERAL>
+            {
+                Integer integer = new Integer(primary.image);
+                literalNode = new LiteralNode();
+                literalNode.setValue(integer);
+                textNode.addChild(literalNode);
+            }
+            |
+            primary = <REAL_LITERAL>
+            {
+                Float f = new Float(primary.image);
+                literalNode = new LiteralNode();
+                literalNode.setValue(f);
+                textNode.addChild(literalNode);
+            }
+            |
+            primary = <TEXT_LITERAL>
+            {
+                String text = primary.image.substring(1,primary.image.length()-1);
+                literalNode = new LiteralNode();
+                literalNode.setValue(text);
+                textNode.addChild(literalNode);
+            }
+            |
+            primary = <IDENTIFIER>
+            {
+                String name = primary.image;
+                if (project.getVariables().get(name) == null)
+                    throw new SemanticError(token,SemanticError.UNKNOWN);
+                identifierNode = new IdentifierNode(project.getVariables());
+                identifierNode.setName(name);
+                textNode.addChild(identifierNode);
+            }
+        )
+    )*
+}
